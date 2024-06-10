@@ -31,10 +31,8 @@ import (
 )
 
 type device struct {
-	//name       string
 	ip       net.IP
 	ipString string
-	//macAddrEP  gopacket.Endpoint
 	macAddrSet bool
 	macAddr    net.HardwareAddr
 }
@@ -42,7 +40,6 @@ type device struct {
 type lan struct {
 	subnet   *netaddr.IPv4Net
 	nHostMax uint32
-	//prefix   = myLAN.subnet.Netmask().PrefixLen()
 }
 
 type indexSpoof struct {
@@ -56,7 +53,6 @@ var (
 	interf           net.Interface
 	packetsCaptured  = make(map[string][]gopacket.Packet)
 	packetsForExport []gopacket.Packet
-	//portsConfidence      = make(map[string]int)
 	block                sync.RWMutex
 	defaultSerializeOpts = gopacket.SerializeOptions{
 		FixLengths:       true,
@@ -66,7 +62,7 @@ var (
 
 // ////////////////////////INITIALIZE/////////////////////
 func initializeMyDevice() {
-	//listOfDevices debe ser 0, mi device debe ser siempre el primero.
+	//listOfDevices must be 0 and my device must be in position 0 always
 	if len(listOfDevices) != 0 {
 		println("Details of the main device exist already")
 		os.Exit(1)
@@ -79,7 +75,6 @@ func initializeMyDevice() {
 	if err != nil {
 		os.Exit(1)
 	}
-	//myDevice.name = name
 
 	//initialize ip version string
 	ipplusprefix := lanscan.LinkLocalAddresses(name)[0]
@@ -89,7 +84,7 @@ func initializeMyDevice() {
 	myDevice.ip = net.ParseIP(myDevice.ipString)
 
 	command := "ip -o addr | awk '/" + myDevice.ipString + "/{print $2}'"
-	//print(command)
+
 	iface, e := exec.Command("bash", "-c", command).Output()
 	if e != nil {
 		print("Error finding IP's interface")
@@ -111,9 +106,6 @@ func initializeMyDevice() {
 		}
 	}
 
-	//fmt.Println(interf.Name)
-	//fmt.Println(interf.HardwareAddr.String())
-	//os.Exit(1)
 	myDevice.macAddr = interf.HardwareAddr
 	myDevice.macAddrSet = true
 	listOfDevices = append(listOfDevices, myDevice)
@@ -139,13 +131,10 @@ func initializeLANHosts() {
 			host.ipString = ip
 			host.ip = net.ParseIP(ip)
 			mac, _ := findMacOf(host.ip)
-			/*if err != nil {
-				fmt.Printf("There is no mac for %d \n", ip)
-				//os.Exit(1)
-			} else {*/
+			
 			host.macAddr = mac
 			host.macAddrSet = true
-			//}
+		
 			// try to add the hostname of the devices
 			listOfDevices = append(listOfDevices, host)
 		}
@@ -176,7 +165,6 @@ func whoIsAlive(listIPs []*netaddr.IPv4) []string {
 	chanel := make(chan bool)
 	returnedIpsChanel := make(chan string)
 
-	//hecho de forma concurrente
 	for i < len(listIPs)-1 {
 		go isAlive(listIPs[i].String(), chanel, returnedIpsChanel)
 		i++
@@ -208,27 +196,17 @@ func scanPorts(ip string, minPort int, maxPort int) {
 	var wg sync.WaitGroup
 	fmt.Printf("Scanning open ports of:  %v \n", ip)
 
-	//thread := 0
-	//channel := make(chan bool)
-
 	wg.Add(maxPort - minPort + 1)
 	for port := minPort; port <= maxPort; port++ {
-		go testTcpConnection(ip, port /*, channel*/, &wg)
-		//thread++
+		go testTcpConnection(ip, port, &wg)
 	}
 	wg.Wait()
-
-	/*for thread > 0 {
-		<-channel
-		thread--
-	}*/
 }
 
 func portScanner(args ...string) error {
 	var input, minP, maxP string
 	minPort := 0
 	maxPort := 1024
-	//var listindex []int
 
 	println("Enter the index number of the IP you want to scan ('all' for scanning all IPs, use '-' for ranges and separate with commas if you want to scan more than one. NO SPACES")
 	fmt.Scanln(&input)
@@ -254,8 +232,7 @@ func portScanner(args ...string) error {
 	return nil
 }
 
-// func testTcpConnection(ip string, port int) {
-func testTcpConnection(ip string, port int, wg *sync.WaitGroup /* chanel chan bool*/) {
+func testTcpConnection(ip string, port int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ipport := net.JoinHostPort(ip, strconv.Itoa(port))
 
@@ -263,15 +240,13 @@ func testTcpConnection(ip string, port int, wg *sync.WaitGroup /* chanel chan bo
 	if err == nil {
 		log.Printf("Port %d: Open\n", port)
 	}
-	//defer conn.Close()
-	//chanel <- true
 }
 
 /////////////////////////SNNIFFING ///////////////////////
 
 func sniffing(args ...string) error {
-	var t, filtro, tC, nameFile /*, ports*/ string
-	var /*listports,*/ listTargets []string
+	var t, filtro, tC, nameFile string
+	var listTargets []string
 	var timeCapturing int
 
 	println("Enter de index number of the IP (source host) you want to sniff ('all' for scanning all IPs, use '-' for ranges and separate with commas if you want to scan more than one. NO SPACES")
@@ -286,7 +261,6 @@ func sniffing(args ...string) error {
 	in := bufio.NewReader(os.Stdin)
 	filtro, _ = in.ReadString('\n')
 	if filtro == "default" {
-		//filtro := "tcp and port dst 80"
 		filtro = "tcp[13] == 0x11 or tcp[13] == 0x10 or tcp[13] ==0x18"
 	}
 
@@ -326,7 +300,6 @@ func sniffing(args ...string) error {
 }
 
 func capturePackets(f string, listTargets []string) {
-	//antes int32(320)
 	handle, err := pcap.OpenLive(interf.Name, int32(1024), true, pcap.BlockForever)
 	if err != nil {
 		fmt.Println("Handle error")
@@ -382,13 +355,6 @@ func printingPackets(listIndex []int) {
 				packet = true
 				for _, p := range listpackets {
 					println(p.String())
-
-					/*ethLayer := p.Layer(layers.LayerTypeEthernet)
-					    	if ethLayer == nil {
-						    	println("No eth layer")
-						    }*/
-					//ethPacket, _ := ethLayer.(*layers.Ethernet)
-					//fmt.Println(ethPacket.SrcMAC)
 				}
 			}
 		}
@@ -410,16 +376,9 @@ func printPackets(args ...string) error {
 	println("Enter the index number of the source hosts. Use '-' for ranges and commas if more than one. 'all' for display all:")
 	fmt.Scanln(&input)
 
-	//if interf == "p" volver a imprimir los hosts
-
 	listIndex := inputToNumberIndex(input)
-	//println(listindex)
 
 	printingPackets(listIndex)
-
-	/*	for _, i := range listindex {
-		printingPackets(listOfDevices[i].ipString)
-	}*/
 	return nil
 }
 
@@ -478,7 +437,7 @@ func add(ip net.IP, macaddr net.HardwareAddr) int {
 				return i
 			}
 			if !bytes.Equal([]byte(dev.macAddr), []byte(macaddr)) {
-				println("Error, las mac no coinciden")
+				println("Error, they are not the same MAC")
 				log.Panic()
 			}
 		}
@@ -497,16 +456,7 @@ func findMacOf(ip net.IP) (net.HardwareAddr, error) {
 	var lineMatch = regexp.MustCompile(`([0-9\.]+)\s+dev\s+([^\s]+)\s+lladdr\s+([0-9a-f:]+)`)
 	who := ip.To4().String()
 
-	//técnicamente el ping existe, no hace falta comprobarlo.
-	/*ping := exec.Command("ping", "-c1", "-t1", who)
-	err:= ping.Start()
-	if err != nil {
-		return nil, err
-	}
-	err = ping.Wait()
-	if err != nil {
-		return nil, err
-	}*/
+	//It is not necessary to ping as it has been done before
 
 	cmd := exec.Command("ip", "n", "show", who)
 	out, err := cmd.Output()
@@ -516,7 +466,7 @@ func findMacOf(ip net.IP) (net.HardwareAddr, error) {
 	}
 
 	matches := lineMatch.FindAllStringSubmatch(string(out), 1)
-	// ver si interesa coger más datos
+	
 	if len(matches) > 0 && len(matches[0]) > 3 {
 		macAddr, err := net.ParseMAC(matches[0][3])
 		if err != nil {
@@ -528,7 +478,6 @@ func findMacOf(ip net.IP) (net.HardwareAddr, error) {
 }
 
 func readARP(handle *pcap.Handle, stop chan struct{}) {
-	//src := gopacket.NewPacketSource(handle, layers.LayerTypeEthernet)
 	src := gopacket.NewPacketSource(handle, handle.LinkType())
 	in := src.Packets()
 
@@ -545,13 +494,12 @@ func readARP(handle *pcap.Handle, stop chan struct{}) {
 				continue
 			}
 			packet := arpLayer.(*layers.ARP)
-			//si el emisor del paquete no soy yo
+			//Sender it is not me
 			if !bytes.Equal([]byte(interf.HardwareAddr), packet.SourceHwAddress) {
 				continue
 			}
-			//guarda las ip y las mac en la tabla
+			//save IP and HwAddr to the table
 			if packet.Operation == layers.ARPReply {
-				//println("adding")
 				add(net.IP(packet.SourceProtAddress), net.HardwareAddr(packet.SourceHwAddress))
 			}
 			log.Println("ARP packet (%d): %v (%v) -> %v (%v)", packet.Operation, net.IP(packet.SourceProtAddress), net.HardwareAddr(packet.SourceHwAddress), net.IP(packet.DstProtAddress), net.HardwareAddr(packet.DstHwAddress))
@@ -655,7 +603,6 @@ func endmitm(handle *pcap.Handle, index []int) chan struct{} {
 		<-t.C
 		close(stopARP)
 	}()
-	//fmt.Printf("index %v %v,", index[0], index[1])
 	return writeARP(handle, stopARP, index[0], index[1], false, 500*time.Millisecond)
 }
 
@@ -673,7 +620,6 @@ func mitm(args ...string) error {
 	index := []int{target1, target2}
 
 	ipforward(1)
-	//println(index[0], index[1])
 
 	handle, err := pcap.OpenLive(interf.Name, 65535, true, pcap.BlockForever)
 	if err != nil {
@@ -759,9 +705,6 @@ func cracking(args ...string) error {
 	fmt.Println("Please, enter your hash type if known: ")
 	fmt.Println("OPTIONS: md5, sha256, sha512, leave empty if unknown")
 	fmt.Scanln(&tipo)
-	//hash := "77f62e3524cd583d698d51fa24fdff4f"
-	//hash := "95a5e1547df73abdd4781b6c9e55f3377c15d08884b11738c2727dbd887d4ced"
-	//hash = fmt.Sprintf("%x", sha3.Sum512([]byte(hash)))
 
 	if tipo == "" {
 		tipo = detectHash(hash)
@@ -960,10 +903,7 @@ func containsString(s string, l []string) bool {
 
 func timer() func() {
 	start := time.Now()
-	//fmt.Printf("start: %v\n", start.String())
 	return func() {
-		//println("func")
-		//fmt.Printf("start func: %v\n", start.String())
 		fmt.Printf("Time took: %v\n", time.Since(start))
 	}
 }
